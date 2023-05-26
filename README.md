@@ -23,6 +23,8 @@ A new Flutter project.
 - 检索功能（能从本地查找零件对应的套件编号）
 
   > 包含手动输入和图片ocr文本识别
+  >
+  > ocr文本识别使用了：[flutter_tesseract_ocr : ^0.4.23](https://pub.flutter-io.cn/packages/flutter_tesseract_ocr)
 
 <img src="assets/1685113892479.png" width=200/>
 
