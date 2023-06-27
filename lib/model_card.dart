@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:ocr_project/part_card.dart';
-import 'package:ocr_project/save_get_from_local.dart';
-import 'package:toast/toast.dart';
+import 'package:ocr_project/local_db_management.dart';
 
 class ModelCard extends StatefulWidget {
   ModelCard(
       {Key? key,
       required this.setNumber,
-      required this.partsList,
+      required this.itemNoList,
       required this.isExpanded,
-        required this.canDelete})
+      required this.canDelete,
+      required this.colorCodeList})
       : super(key: key);
   final String setNumber;
-  final List<String> partsList;
+  final List<String> itemNoList;
+  final List<String> colorCodeList;
   late bool isExpanded;
   final bool canDelete;
 
@@ -51,16 +52,16 @@ class _ModelCardState extends State<ModelCard> {
                   });
               if (result) {
                 if (widget.canDelete) {
-                  removeSetNumberAndPartsFromLocal(widget.setNumber);
+                  removeSetNumAndPartsFromLocal(widget.setNumber);
                 } else {
-                  saveSetNumberAndPartsToLocal(widget.setNumber, widget.partsList);
+                  saveSetNumAndPartsToLocal(widget.setNumber, widget.itemNoList, widget.colorCodeList);
                 }
               }
             },
             child: Container(
               color: Colors.grey[200],
               child: ListTile(
-                title: Text("LEGO Set : " + widget.setNumber),
+                title: Text("套装编号 : ${widget.setNumber}"),
                 trailing: IconButton(
                   icon: Icon(widget.isExpanded ? Icons.arrow_drop_up : Icons.arrow_drop_down,
                       size: 30),
@@ -77,9 +78,10 @@ class _ModelCardState extends State<ModelCard> {
           ListView.builder(
               physics: const ClampingScrollPhysics(),
               shrinkWrap: true,
-              itemCount: widget.partsList.length,
+              itemCount: widget.itemNoList.length,
               itemBuilder: (context, index) {
-                return PartCard(partNum: widget.partsList[index]);
+                return PartCard(itemNo: widget.itemNoList[index],
+                    colorCode: widget.colorCodeList[index], partIndex: index + 1,);
           }) : const SizedBox()
         ],
       ),

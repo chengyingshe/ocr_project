@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ocr_project/add_moduel_by_hand.dart';
+import 'package:ocr_project/camera_scan.dart';
 import 'package:ocr_project/model_page.dart';
 import 'package:ocr_project/search_page.dart';
 import 'package:ocr_project/tabs.dart';
@@ -14,6 +15,7 @@ void main() {
       "/Tabs": (context) => const Tabs(),
       "/SearchFromNetworkPage": (context) => const SearchPage(title: "网络检索", autoFocus: true),
       "/AddModuleByHandPage": (context) => const AddModuleByHandPage(),
+      "/CameraScanPage": (context) => const CameraScanPage(),
     },
     home: const MyMainPage(),
   ));

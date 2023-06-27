@@ -2,11 +2,12 @@ import 'package:flukit/flukit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:ocr_project/model_card.dart';
-import 'package:ocr_project/save_get_from_local.dart';
+import 'package:ocr_project/local_db_management.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 List<String>? allSets;
-List<List<String>> allPartsOfSets = [];
+List<List<String>> allItemNoList = [];
+List<List<String>> allColorCodeList = [];
 
 class ModelPage extends StatefulWidget {
   const ModelPage({Key? key}) : super(key: key);
@@ -21,7 +22,6 @@ class _ModelPageState extends State<ModelPage> {
     return Scaffold(
       appBar: AppBar(title: const Text("我的LEGO")),
       floatingActionButton: SpeedDial(
-        child: Icon(Icons.add),
         children: [
           SpeedDialChild(
               // child: const Icon(Icons.add_circle_outline, color: Colors.white),
@@ -39,7 +39,7 @@ class _ModelPageState extends State<ModelPage> {
                 await refresh();
               }),
         ],
-
+        child: const Icon(Icons.add),
       ),
       body: PullRefreshScope(
         child: CustomScrollView(
@@ -53,21 +53,20 @@ class _ModelPageState extends State<ModelPage> {
                 await refresh();
               },
             ),
+            // SizedBox(),
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   // print("length=${allSets!.length}");
-                  if (allSets == null) {
-                    return const SizedBox();
-                  } else {
-                    return ModelCard(
-                        setNumber: allSets![index],
-                        partsList: allPartsOfSets[index],
-                        isExpanded: false,
-                        canDelete: true);
-                  }
+                    return (allSets == null || allSets!.isEmpty) ? const SizedBox() :
+                     ModelCard(
+                          setNumber: allSets![index],
+                          itemNoList: allItemNoList[index],
+                          isExpanded: false,
+                          canDelete: true,
+                          colorCodeList: allColorCodeList[index]);
                 },
-                childCount: allPartsOfSets.length,
+                childCount: allSets == null ? 0 : allSets!.length,
               ),
             ),
           ],
@@ -79,16 +78,18 @@ class _ModelPageState extends State<ModelPage> {
   Future<void> refresh() async {
     final prefs = await SharedPreferences.getInstance();
     allSets = await getAllSetsFromLocal(prefs);
-    allPartsOfSets = [];
+    allItemNoList = [];
+    allColorCodeList = [];
+    print('allSets=${allSets.toString()}');
     if (allSets != null) {
       for (String set in allSets!) {
-        allPartsOfSets.add(await getListOfPartsByNumber(set));
+        List<List<String>?> parts = await getListOfPartsBySetNum(set);
+        setState(() {
+          allItemNoList.add(parts[0]!);
+          allColorCodeList.add(parts[1]!);
+        });
       }
     }
-    setState(() {
-      allSets = allSets;
-      allPartsOfSets = allPartsOfSets;
-    });
   }
 
   @override

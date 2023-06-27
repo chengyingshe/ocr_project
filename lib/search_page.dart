@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
+import 'package:ocr_project/constant.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,9 +8,9 @@ import 'package:ocr_project/model_card.dart';
 import 'package:toast/toast.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
-import 'save_get_from_local.dart';
-import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
+import 'local_db_management.dart';
 import 'dart:io';
+import 'extract_text.dart';
 
 
 class SearchPage extends StatefulWidget {
@@ -24,19 +23,26 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => _SearchPageState();
 }
 
+enum Selection { fromSetNum, fromItemNo, fromColorCode }
+Selection _selectedOption = Selection.fromItemNo;
+
 class _SearchPageState extends State<SearchPage> {
   TextEditingController numberController = TextEditingController();
   String showText = "";
   bool loading = false;
   // List<String> parts = [];
   List<String> setNumberList = [];
-  List<List<String>> allPartsOfSets = [];
-  bool solveImageIsFile = false;
+  List<String> itemNoList = [];
+  List<String> colorCodeList = [];
   ImagePicker picker = ImagePicker();
-  File? _userImage;
-  XFile? imageXFile;
+  // File? _userImage;
+  // XFile? imageXFile;
   bool bload = false;
   bool _showClearButton = false;
+  bool solveImageIsFile = false;
+  late File _userImage;
+  String debugText = "";
+
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +55,7 @@ class _SearchPageState extends State<SearchPage> {
             child: ListView(
               children: [
                 TextFormField(
-                  maxLength: 15,
+                  maxLength: maxDetectTextSize,
                   autofocus: widget.autoFocus && (!loading),
                   maxLines: 1,
                   style: const TextStyle(color: Colors.black, fontSize: 18),
@@ -57,7 +63,7 @@ class _SearchPageState extends State<SearchPage> {
                   textInputAction: TextInputAction.search,
                   // keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    hintText: widget.title == "本地检索" ? "请输入积木编号" : "请输入乐高模组编号",
+                    hintText: widget.title == "本地检索" ? "请输入搜索编号" : "请输入乐高套装编号",
                     focusColor: Colors.blue[300],
                     prefixIcon: Icon(Icons.search, color: Colors.blue[300]),
                     border: OutlineInputBorder(
@@ -71,10 +77,15 @@ class _SearchPageState extends State<SearchPage> {
                                 onTap: _clearText,
                                 child: const Icon(Icons.clear_rounded, size: 18),
                               )
-                            : SizedBox(),
+                            : const SizedBox(),
+                        widget.title == "本地检索" ? IconButton(
+                            constraints: const BoxConstraints(maxWidth: 35),
+                          onPressed: () async {
+                            await showSearchSetting();
+                          }, icon: const Icon(Icons.settings)) : const SizedBox(),
                         IconButton(
+                            constraints: const BoxConstraints(maxWidth: 40),
                             icon: const Icon(Icons.document_scanner_outlined),
-                            color: Colors.blue[300],
                             onPressed: () async {
                               await selectImage();
                               submit(numberController.text);
@@ -99,10 +110,17 @@ class _SearchPageState extends State<SearchPage> {
                         itemBuilder: (context, index) {
                           return ModelCard(
                               setNumber: setNumberList[index],
-                              partsList: allPartsOfSets[index],
+                              itemNoList: itemNoList,
+                              colorCodeList: colorCodeList,
                               isExpanded: widget.title == "本地检索" ? false : true,
                               canDelete: false);
-                        })
+                        }),
+                // ModelCard(
+                //     setNumber: '111',
+                //     itemNoList: ['111', '111'],
+                //     isExpanded: widget.title == "本地检索" ? false : true,
+                //     canDelete: false,
+                //     colorCodeList: ['111', '111']),
               ],
             ),
           ),
@@ -135,7 +153,7 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> submit(String input) async {
     setNumberList = [];
-    allPartsOfSets = [];
+    itemNoList = [];
     if (input.trim() == "") {
       Toast.show('输入不能为空', gravity: Toast.bottom);
     } else {
@@ -143,32 +161,45 @@ class _SearchPageState extends State<SearchPage> {
         showText = "";
         loading = true;
       });
-      if (widget.title == "本地检索") {
-        //search from local data
-        setNumberList = await getSetsNumberByPartsNumber(input);
-        if (setNumberList.isEmpty) {
-          // not exists in local data
+      if (widget.title == "本地检索") { // search from local data
+        switch (_selectedOption) { // 根据选择使用不同查找方式
+          case Selection.fromSetNum:
+            if (await numberIsExist(input)) {
+              setNumberList = [input];
+            } else {
+              setNumberList = [];
+            }
+            break;
+          case Selection.fromItemNo:
+            setNumberList = await getSetsNumberByItemNo(input);
+            break;
+          case Selection.fromColorCode:
+            setNumberList = await getSetsNumberByColorCode(input);
+            break;
+        }
+        print("setNumberList=${setNumberList.toString()}");
+        if (setNumberList.isEmpty) { // not exists in local data
           setState(() {
             showText = "从本地未查询到相应的乐高模组";
             loading = false;
           });
-        } else {
-          // exists in local data
+        } else { // exists in local data
           setState(() {
             showText = "从本地查询到以下乐高模组：";
           });
           for (String set in setNumberList) {
-            allPartsOfSets.add(await getListOfPartsByNumber(set));
+            List<List<String>?> ic = await getListOfPartsBySetNum(set);
+            itemNoList = ic[0]!;
+            colorCodeList = ic[1]!;
           }
           setState(() {
             loading = false;
           });
         }
+
       } else {
         //search from network
-        print("allPartsOfSets=" + allPartsOfSets.toString());
-        print("setNumberList=" + setNumberList.toString());
-        String? html = await getHtmlFromNetwork(input);
+        String? html = await getHtmlFromNetwork2(input);
         if (html == null) {
           // network error
           Toast.show('网络出现异常', gravity: Toast.bottom);
@@ -176,14 +207,16 @@ class _SearchPageState extends State<SearchPage> {
             loading = false;
           });
         } else {
-          setState(() {
-            allPartsOfSets = [getPartsListFromHtml(html)];
-          });
+          List<List<String>> ic = getItemNoAndColorCodeOfPartsFromHtml(html);
+          print(ic);
+          itemNoList = ic[0];
+          colorCodeList = ic[1];
+          // setState(() {
+          //   itemNoList = [getPartsListFromHtml(html)];
+          // });
           // print("allPartsOfSets.isEmpty" + allPartsOfSets.isEmpty.toString());
-          if (allPartsOfSets[0].isEmpty) {
-            //not found
+          if (itemNoList.isEmpty || colorCodeList.isEmpty) { // not found
             setState(() {
-              // setNumberList = [];
               showText = "从网络中未查询到相应的乐高模组";
             });
           } else {
@@ -191,12 +224,10 @@ class _SearchPageState extends State<SearchPage> {
               setNumberList = [numberController.text];
               showText = "从网络中查询到以下乐高模组：";
             });
-            // print(allPartsOfSets.toString());
           }
           setState(() {
             loading = false;
           });
-          // print("setNumberList=" + setNumberList.toString());
         }
       }
     }
@@ -218,7 +249,7 @@ class _SearchPageState extends State<SearchPage> {
               topRight: Radius.circular(20.0),
             ),
           ),
-          height: 180,
+          height: 200,
           child: Column(children: [
             SizedBox(
               height: 50,
@@ -239,64 +270,34 @@ class _SearchPageState extends State<SearchPage> {
             const Divider(height: 1.0),
             Expanded(
                 child: Column(
-              children: [
-                ListTile(
-                    leading: const Icon(Icons.photo),
-                    title: const Text('从相册中选择'),
-                    onTap: () {
-                      Navigator.of(context).pop(0);
-                    }),
-                const Divider(),
-                ListTile(
-                    leading: const Icon(Icons.photo_camera),
-                    title: const Text('使用相机拍摄'),
-                    onTap: () {
-                      Navigator.of(context).pop(1);
-                    }),
-              ],
-            )),
+                  children: [
+                    ListTile(
+                        leading: const Icon(Icons.photo),
+                        title: const Text('从相册中选择'),
+                        onTap: () {
+                          Navigator.of(context).pop(0);
+                        }),
+                    const Divider(),
+                    ListTile(
+                        leading: const Icon(Icons.photo_camera),
+                        title: const Text('使用相机扫描'),
+                        onTap: () {
+                          Navigator.of(context).pop(1);
+                        }),
+                  ],
+                )),
           ]),
         );
       },
     );
   }
 
-  Future<String> extractTextFromImagePath(String imagePath) async {
-    String text = await FlutterTesseractOcr.extractText(imagePath,
-        language: 'eng',
-        args: {
-          "psm": "4",
-          "preserve_interword_spaces": "1",
-        });
-    setState(() {});
-    return text;
-  }
-
-  Future<String> extractTextFromUrl(String url) async {
-    Directory tempDir = await getTemporaryDirectory();
-    Dio dio = Dio();
-    var response =
-        await dio.get(url, options: Options(responseType: ResponseType.bytes));
-    final List<int> imageData = response.data!;
-    Uint8List bytes = Uint8List.fromList(imageData);
-    String dir = tempDir.path;
-    print('$dir/test.jpg');
-    File file = File('$dir/test.jpg');
-    await file.writeAsBytes(bytes);
-    String imagePath = file.path;
-
-    bload = true;
-    setState(() {});
-
-    String text = await FlutterTesseractOcr.extractText(imagePath,
-        language: 'eng',
-        args: {
-          "psm": "4",
-          "preserve_interword_spaces": "1",
-        });
-    bload = false;
-    setState(() {});
-    return text;
+  Future<void> getCameraScanText() async {
+    String detectText = (await Navigator.of(context).pushNamed("/CameraScanPage")).toString();
+    print("detectText=$detectText");
+    if (detectText != "null") {
+      numberController.text = detectText;
+    }
   }
 
   Future<void> selectImage() async {
@@ -308,29 +309,26 @@ class _SearchPageState extends State<SearchPage> {
         await _getImage();
       } else if (select == 1) {
         // await _getCameraImage();
-        await _getCameraImage();
+        await getCameraScanText();
       }
       // print("_userImage=$_userImage");
-      if (_userImage != null) {
+      if (select == 0) { //选择相册时
         // String url = "https://img.buzzfeed.com/buzzfeed-static/static/2018-10/4/1/asset/buzzfeed-prod-web-05/sub-buzz-11577-1538631066-1.jpg";
-        String text = await extractTextFromImagePath(_userImage!.path);
+        String text = await extractTextFromImagePath(_userImage.path);
         if (text == "") {
           Toast.show('未检测到文本', gravity: Toast.bottom);
         } else {
           setState(() {
-            numberController.text = text.replaceAll("\n", "").substring(
-                0, text.length < 15 ? text.length : 15); //first 10 chars
+            numberController.text = text;
           });
         }
         print("text=$text");
       }
     }
   }
-
-
   Future<void> _getCameraImage() async {
     final XFile? imagePicker =
-        await picker.pickImage(source: ImageSource.camera);
+    await picker.pickImage(source: ImageSource.camera);
     if (mounted) {
       setState(() {
         //拍摄照片不为空
@@ -342,11 +340,10 @@ class _SearchPageState extends State<SearchPage> {
       });
     }
   }
-
   Future<void> _getImage() async {
     //选择相册
     final XFile? pickerImages =
-        await picker.pickImage(source: ImageSource.gallery);
+    await picker.pickImage(source: ImageSource.gallery);
     if (mounted) {
       setState(() {
         if (pickerImages != null) {
@@ -359,6 +356,8 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<String?> getHtmlFromNetwork(String number) async {
+    //从官网获取套件及零件编号
+    //https://www.bricklink.com/catalogList.asp
     setState(() {
       loading = true;
     });
@@ -374,7 +373,6 @@ class _SearchPageState extends State<SearchPage> {
       return null;
     }
   }
-
   List<String> getPartsListFromHtml(String html) {
     List<String> partsList = [];
     // htmlText = "";
@@ -392,5 +390,106 @@ class _SearchPageState extends State<SearchPage> {
       }
     });
     return partsList;
+  }
+
+  Future<String?> getHtmlFromNetwork2(String number) async {
+    //从官网获取套件及零件编号  获取套装编号（图片）、积木块的设计编号、元素编号（图片）
+    //https://www.bricklink.com/v2/catalog/catalogitem.page?S=60114-1#T=I
+    setState(() {
+      loading = true;
+    });
+    Dio dio = Dio();
+    var response = await dio.get('https://www.bricklink.com/v2/catalog/catalogitem.page?S=$number#T=I');
+    // print("status=" + response.statusCode.toString());
+    if (response.statusCode == 200) {
+      return response.data;
+    } else {
+      return null;
+    }
+  }
+
+  List<List<String>> getItemNoAndColorCodeOfPartsFromHtml(String html) {
+    //[[part1ItemNo, part2ItemNo, ...], [part1ColorCode, part2ColorCode, ...]]
+    List<String> itemNoList = [];
+    List<String> colorCodeList = [];
+    var document = html_parser.parse(htmlData);
+    List<dom.Element> elements = document.getElementsByClassName('pciinvItemRow');
+    // print("elements=${elements.length}");
+    for (int i=1; i<elements.length; i++) { //i=0时为Set Item
+      var element = elements[i];
+      try { // 防止 Part Color Code Missing报错
+        String? itemNo = element.getElementsByTagName('td')[3].text;
+        RegExp re1 = RegExp(r'^[a-zA-Z0-9]+$'); // 正则表达式匹配只含有数字或字母的字符串（筛出组件）
+        if (!re1.hasMatch(itemNo)) {continue;}
+        String? colorCode = element.getElementsByTagName('td')[4].getElementsByClassName('pciinvPartsColorCode').first.text;
+        if (colorCode.isNotEmpty) {
+          colorCode = colorCode.replaceAll(' or ', '\\');
+          colorCodeList.add(colorCode);
+          itemNoList.add(itemNo);
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+    return [itemNoList, colorCodeList];
+  }
+
+  //点击设置后跳出对话框，显示查找类型（SetNum, itemNo, colorCode）
+  Future<void> showSearchSetting() {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("查询设置"),
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return SizedBox(
+                height: 180,
+                child: Column(
+                  children: [
+                    ListTile(
+                      title: const Text('查询套装编号'),
+                      leading: Radio(
+                        value: Selection.fromSetNum,
+                        groupValue: _selectedOption,
+                        onChanged: (Selection? value) {
+                          setState(() {
+                            _selectedOption = value!;
+                          });
+                        },
+                      ),
+                    ),
+                    ListTile(
+                      title: const Text('查询设计编号'),
+                      leading: Radio(
+                        value: Selection.fromItemNo,
+                        groupValue: _selectedOption,
+                        onChanged: (Selection? value) {
+                          setState(() {
+                            _selectedOption = value!;
+                          });
+                        },
+                      ),
+                    ),
+                    ListTile(
+                      title: const Text('查询颜色编号'),
+                      leading: Radio(
+                        value: Selection.fromColorCode,
+                        groupValue: _selectedOption,
+                        onChanged: (Selection? value) {
+                          setState(() {
+                            _selectedOption = value!;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 }

@@ -8,14 +8,12 @@ class Tab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tabs();
+    return const Tabs();
   }
 }
 
-
 class Tabs extends StatefulWidget {
   const Tabs({Key? key}) : super(key: key);
-
   @override
   State<Tabs> createState() => _TabsState();
 }
@@ -24,8 +22,8 @@ class _TabsState extends State<Tabs> {
   DateTime? _lastPressedAt; //记录上次点击的时间
   int _currentIndex = 0;
   final List<Widget> _pagesList = [
-    SearchPage(title: "本地检索", autoFocus: false),
-    ModelPage()
+    const SearchPage(title: "本地检索", autoFocus: false),
+    const ModelPage()
   ];
 
   @override
