@@ -9,7 +9,7 @@ const maxDetectTextSize = 20;
 const String detectNoText = "未检测到文本";
 const String searchFromNetWorkPageTitle = "网络检索";
 const String searchPageTitle = "本地检索";
-
+const String accessToken = '24.9712623890c2560cf912062beb546c7d.2592000.1691730502.282335-36056768';
 
 
 const String htmlData = r"""

@@ -4,6 +4,7 @@ import 'package:ocr_project/camera_scan.dart';
 import 'package:ocr_project/model_page.dart';
 import 'package:ocr_project/search_page.dart';
 import 'package:ocr_project/tabs.dart';
+import 'package:ocr_project/voice_recorder.dart';
 
 void main() {
   runApp(MaterialApp(

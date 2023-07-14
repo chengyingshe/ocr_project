@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:image/image.dart' as img;
 import 'package:ocr_project/constant.dart';
 import 'package:path_provider/path_provider.dart';
-import 'extract_text.dart';
+import 'api.dart';
 
 class CameraScanPage extends StatelessWidget {
   const CameraScanPage({Key? key}) : super(key: key);
@@ -42,7 +42,7 @@ class _CameraScreenState extends State<CameraScreen> {
   void initState() {
     super.initState();
     _initializeCamera();
-    _timer = Timer.periodic(const Duration(milliseconds: 1500), (timer) {
+    _timer = Timer.periodic(const Duration(milliseconds: 2000), (timer) {
       //每隔1s拍摄一次图片
       takePictureFromBox();
     });
@@ -93,8 +93,10 @@ class _CameraScreenState extends State<CameraScreen> {
           .writeAsBytesSync(img.encodeJpg(croppedImage)); //把图片保存到本地
       // 打印裁剪后图像的保存路径
       // print('Cropped image saved to: $croppedImagePath');
-      String text = await extractTextFromImagePath(croppedImagePath);
+      // String text = await extractTextFromImagePath(croppedImagePath);
+      String text = await extractTextFromImagePathUsingBaiduApi(croppedImagePath);
       detectText = text == "" ? detectNoText : text;
+      print("detectText=$text");
       setState(() {});
     } catch (e) {
       print(e);
@@ -137,8 +139,6 @@ class _CameraScreenState extends State<CameraScreen> {
             Positioned.fill(
               child: CameraPreview(_cameraController),
             ),
-            // Image.file(File(
-            //     "/data/user/0/com.example.ocr_project/app_flutter/cropped_image.jpg")),
             Positioned(
               //显示检测文本
               top: windowY - 25,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:ocr_project/add_moduel_by_hand.dart';
 import 'package:ocr_project/constant.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +11,8 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
 import 'local_db_management.dart';
 import 'dart:io';
-import 'extract_text.dart';
+import 'api.dart';
+import 'voice_recorder.dart';
 
 
 class SearchPage extends StatefulWidget {
@@ -84,11 +86,19 @@ class _SearchPageState extends State<SearchPage> {
                             await showSearchSetting();
                           }, icon: const Icon(Icons.settings)) : const SizedBox(),
                         IconButton(
+                            constraints: const BoxConstraints(maxWidth: 35),
+                            icon: const Icon(Icons.mic_none_rounded),
+                            onPressed: () async {
+                              await startVoiceRecorder(numberController);
+                            }),
+                        IconButton(
                             constraints: const BoxConstraints(maxWidth: 40),
                             icon: const Icon(Icons.document_scanner_outlined),
                             onPressed: () async {
                               await selectImage();
-                              submit(numberController.text);
+                              if (numberController.text.isNotEmpty) {
+                                submit(numberController.text);
+                              }
                             }),
                       ],
                     ),
@@ -115,12 +125,6 @@ class _SearchPageState extends State<SearchPage> {
                               isExpanded: widget.title == "本地检索" ? false : true,
                               canDelete: false);
                         }),
-                // ModelCard(
-                //     setNumber: '111',
-                //     itemNoList: ['111', '111'],
-                //     isExpanded: widget.title == "本地检索" ? false : true,
-                //     canDelete: false,
-                //     colorCodeList: ['111', '111']),
               ],
             ),
           ),
@@ -140,7 +144,6 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void dispose() {
     numberController.dispose();
-    // FlutterMobileVision.stop();
     super.dispose();
   }
 
@@ -148,6 +151,12 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       numberController.clear();
       _showClearButton = false;
+    });
+  }
+
+  Future<void> startVoiceRecorder(TextEditingController textCtr) {
+    return showDialog(context: context, builder: (context) {
+      return VoiceRecorder(textCtr: textCtr);
     });
   }
 
@@ -207,17 +216,14 @@ class _SearchPageState extends State<SearchPage> {
             loading = false;
           });
         } else {
+          debugPrint(html);
           List<List<String>> ic = getItemNoAndColorCodeOfPartsFromHtml(html);
-          print(ic);
           itemNoList = ic[0];
           colorCodeList = ic[1];
-          // setState(() {
-          //   itemNoList = [getPartsListFromHtml(html)];
-          // });
-          // print("allPartsOfSets.isEmpty" + allPartsOfSets.isEmpty.toString());
           if (itemNoList.isEmpty || colorCodeList.isEmpty) { // not found
             setState(() {
               showText = "从网络中未查询到相应的乐高模组";
+              // showText = html;
             });
           } else {
             setState(() {
@@ -314,7 +320,7 @@ class _SearchPageState extends State<SearchPage> {
       // print("_userImage=$_userImage");
       if (select == 0) { //选择相册时
         // String url = "https://img.buzzfeed.com/buzzfeed-static/static/2018-10/4/1/asset/buzzfeed-prod-web-05/sub-buzz-11577-1538631066-1.jpg";
-        String text = await extractTextFromImagePath(_userImage.path);
+        String text = await extractTextFromImagePathUsingBaiduApi(_userImage.path);
         if (text == "") {
           Toast.show('未检测到文本', gravity: Toast.bottom);
         } else {
@@ -375,7 +381,6 @@ class _SearchPageState extends State<SearchPage> {
   }
   List<String> getPartsListFromHtml(String html) {
     List<String> partsList = [];
-    // htmlText = "";
     var document = html_parser.parse(html);
     List<dom.Element> links = document.querySelectorAll('a');
     final pattern = RegExp(r'^\d+[pbc]*\d+$'); //85984pb234
@@ -399,11 +404,19 @@ class _SearchPageState extends State<SearchPage> {
       loading = true;
     });
     Dio dio = Dio();
-    var response = await dio.get('https://www.bricklink.com/v2/catalog/catalogitem.page?S=$number#T=I');
-    // print("status=" + response.statusCode.toString());
-    if (response.statusCode == 200) {
-      return response.data;
-    } else {
+    //https://www.bricklink.com/v2/catalog/catalogitem.page?S=60124
+    try {
+      //Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
+      var headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"};
+      var response = await dio.get('https://www.bricklink.com/v2/catalog/catalogitem.page?S=$number',
+      options: Options(headers: headers));
+      // print('headers=' + response.headers.toString());
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        return null;
+      }
+    } catch (e) {
       return null;
     }
   }
@@ -412,9 +425,11 @@ class _SearchPageState extends State<SearchPage> {
     //[[part1ItemNo, part2ItemNo, ...], [part1ColorCode, part2ColorCode, ...]]
     List<String> itemNoList = [];
     List<String> colorCodeList = [];
-    var document = html_parser.parse(htmlData);
-    List<dom.Element> elements = document.getElementsByClassName('pciinvItemRow');
-    // print("elements=${elements.length}");
+    var document = html_parser.parse(html);
+    print('document=${document.outerHtml}');
+    List<dom.Element> elements = document.getElementsByClassName('pciinvMainTable');
+    // List<dom.Element> elements = document.getElementsByClassName('pciinvItemRow');
+    print(elements.length);
     for (int i=1; i<elements.length; i++) { //i=0时为Set Item
       var element = elements[i];
       try { // 防止 Part Color Code Missing报错
@@ -431,6 +446,8 @@ class _SearchPageState extends State<SearchPage> {
         continue;
       }
     }
+    print(itemNoList.toString());
+    print(colorCodeList.toString());
     return [itemNoList, colorCodeList];
   }
 
