@@ -1,7 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:toast/toast.dart';
 
-
 Future<List<String>?> getAllSetsFromLocal(SharedPreferences prefs) async {
   return prefs.getStringList("Sets");
 }
@@ -11,11 +10,10 @@ Future<List<String>> getSetsNumberByItemNo(String itemNo) async {
   List<String> sets = [];
   final prefs = await SharedPreferences.getInstance();
   List<String>? allSets = await getAllSetsFromLocal(prefs);
-
   if (allSets == null) {return [];}
   for (String set in allSets) {
     List<List<String>?> parts = await getListOfPartsBySetNum(set);
-    print("parts=${parts.toString()}");
+    // print("parts=${parts.toString()}");
     List<String> itemNoList = parts[0]!;
     for (String i in itemNoList) {
       if (i == itemNo) {
@@ -35,13 +33,13 @@ Future<List<String>> getSetsNumberByColorCode(String colorCode) async {
   if (allSets == null) {return [];}
   for (String set in allSets) {
     List<List<String>?> parts = await getListOfPartsBySetNum(set);
-    // List<String> itemNoList = parts[0];
     List<String> colorCodeList = parts[1]!;
+    // print('colorCodeList=${colorCodeList}');
     bool find = false;
     int i = 0;
-    while (!find) {
-      String cc = colorCodeList[i++];
-      List<String> list = cc.split('\\');
+    while (!find && i < colorCodeList.length) {
+      List<String> list = colorCodeList[i++].split('\\');
+      // print('list=${list.toString()}');
       for (String code in list) {
         if (code == colorCode) {
           sets.add(set);
@@ -59,7 +57,21 @@ Future<List<List<String>?>> getListOfPartsBySetNum(String number) async {
   final prefs = await SharedPreferences.getInstance();
   List<String>? itemNoList = prefs.getStringList(getItemNoListName(number));
   List<String>? colorCodeList = prefs.getStringList(getColorCodeListName(number));
-  return [itemNoList, colorCodeList];
+  String? setImageUrl = await getSetImageUrlBySetNum(number);
+  List<String>? partImageUrlList = prefs.getStringList(getPartImageUrlListName(number));
+  return [itemNoList, colorCodeList, [setImageUrl!], partImageUrlList];
+}
+
+Future<String?> getSetImageUrlBySetNum(String number) async {
+  final prefs = await SharedPreferences.getInstance();
+  List<String>? allSets = prefs.getStringList("Sets");
+  List<String>? allSetsImageUrlList = prefs.getStringList("SetsImageUrlList");
+  if (allSets == null) {
+    return null;
+  } else {
+    int index = allSets.indexOf(number);
+    return allSetsImageUrlList![index];
+  }
 }
 
 Future<bool> numberIsExist(String number) async {
@@ -75,23 +87,30 @@ Future<bool> numberIsExist(String number) async {
   }
 }
 
-String getItemNoListName(String number) {return "${number}ItemNo";}
-String getColorCodeListName(String number) {return "${number}ColorCode";}
+String getItemNoListName(String number) {return "ItemNo$number";}
+String getColorCodeListName(String number) {return "ColorCode$number";}
+String getPartImageUrlListName(String number) {return "PartImageUrl$number";}
+
 
 //存储
-Future<void> saveSetNumAndPartsToLocal(String number, List<String> itemNoList, List<String> colorCodeList) async {
+Future<void> saveSetNumAndPartsToLocal(String number, List<String> itemNoList, List<String> colorCodeList, String setImageUrl, List<String> partImageUrlList) async {
   final prefs = await SharedPreferences.getInstance();
   if (!await numberIsExist(number)) { // not exists
     // print("当前模型不存在");
     List<String>? allSets = prefs.getStringList("Sets");
+    List<String>? allSetsImageUrlList = prefs.getStringList("SetsImageUrlList");
     if (allSets == null) { //添加第一个SetNum时
       allSets = [number];
+      allSetsImageUrlList = [setImageUrl];
     } else {
       allSets.add(number);
+      allSetsImageUrlList!.add(setImageUrl);
     }
     prefs.setStringList("Sets", allSets);
+    prefs.setStringList("SetsImageUrlList", allSetsImageUrlList);
     prefs.setStringList(getItemNoListName(number), itemNoList); //保存ItemNo
     prefs.setStringList(getColorCodeListName(number), colorCodeList); //保存ColorCode
+    prefs.setStringList(getPartImageUrlListName(number), partImageUrlList);
     Toast.show('保存成功', gravity: Toast.bottom);
   } else {
     Toast.show('当前模组已存在', gravity: Toast.bottom);
@@ -101,9 +120,14 @@ Future<void> saveSetNumAndPartsToLocal(String number, List<String> itemNoList, L
 Future<void> removeSetNumAndPartsFromLocal(String number) async {
   final prefs = await SharedPreferences.getInstance();
   List<String> allSets = prefs.getStringList("Sets")!;
-  allSets.remove(number);
+  List<String> allSetsImageUrlList = prefs.getStringList("SetsImageUrlList")!;
+  int index = allSets.indexOf(number);
+  allSets.removeAt(index);
+  allSetsImageUrlList.removeAt(index);
   prefs.remove(getItemNoListName(number));
   prefs.remove(getColorCodeListName(number));
+  prefs.remove(getPartImageUrlListName(number));
   prefs.setStringList("Sets", allSets);
+  prefs.setStringList("SetsImageUrlList", allSetsImageUrlList);
   Toast.show('删除成功', gravity: Toast.bottom);
 }

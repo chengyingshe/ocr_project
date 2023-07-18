@@ -24,6 +24,7 @@ dependencies:
   camera: ^0.10.5
   image: ^4.0.17
   flutter_sound: ^9.2.13
+  csv: ^5.0.2
 
 dev_dependencies:
   flutter_test:
@@ -36,7 +37,9 @@ flutter:
   assets:
    - assets/tessdata_config.json
    - assets/tessdata/eng.traineddata
-   - images/logo.jpg
+   - images/logo.png
+   - images/no_image.png
+   - assets/lego_parts.csv
   # fonts:
   #   - family: Schyler
   #     fonts:

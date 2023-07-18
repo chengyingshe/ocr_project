@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" />
     <application
-        android:label="ocr_project"
+        android:label="乐高分拣系统"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

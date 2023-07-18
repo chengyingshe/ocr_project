@@ -49,7 +49,7 @@ class _AddModuleByHandPageState extends State<AddModuleByHandPage> {
                     getSetNoAndPartNumFromText(textCtr.text);
                     // print("setNo=$setNum");
                     if (setNum != "" && itemNoList.isNotEmpty && colorCodeList.isNotEmpty) {
-                      saveSetNumAndPartsToLocal(setNum, itemNoList, colorCodeList);
+                      saveSetNumAndPartsToLocal(setNum, itemNoList, colorCodeList, "", List<String>.filled(itemNoList.length, ""));
                     }
                   }, child: const Text('添加模组')),
                   const SizedBox(width: 10),
@@ -86,9 +86,6 @@ class _AddModuleByHandPageState extends State<AddModuleByHandPage> {
           colorCodeList.add(ic[1]);
         }
         setState(() {});
-        // print(itemNoList);
-        // print(colorCodeList);
-
       }
     }
   }

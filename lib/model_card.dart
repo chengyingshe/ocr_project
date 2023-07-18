@@ -9,13 +9,17 @@ class ModelCard extends StatefulWidget {
       required this.itemNoList,
       required this.isExpanded,
       required this.canDelete,
-      required this.colorCodeList})
+      required this.colorCodeList,
+      required this.setImageUrl,
+      required this.partImageUrlList})
       : super(key: key);
   final String setNumber;
   final List<String> itemNoList;
   final List<String> colorCodeList;
   late bool isExpanded;
   final bool canDelete;
+  final String setImageUrl;
+  final List<String> partImageUrlList;
 
   @override
   State<ModelCard> createState() => _ModelCardState();
@@ -54,37 +58,59 @@ class _ModelCardState extends State<ModelCard> {
                 if (widget.canDelete) {
                   removeSetNumAndPartsFromLocal(widget.setNumber);
                 } else {
-                  saveSetNumAndPartsToLocal(widget.setNumber, widget.itemNoList, widget.colorCodeList);
+                  saveSetNumAndPartsToLocal(
+                      widget.setNumber,
+                      widget.itemNoList,
+                      widget.colorCodeList,
+                      widget.setImageUrl,
+                      widget.partImageUrlList);
                 }
               }
             },
             child: Container(
               color: Colors.grey[200],
               child: ListTile(
+                onTap: () {
+                  setState(() {
+                    widget.isExpanded = !widget.isExpanded;
+                  });
+                },
+                leading: ShowImage(imageUrl: widget.setImageUrl),
                 title: Text("套装编号 : ${widget.setNumber}"),
-                trailing: IconButton(
-                  icon: Icon(widget.isExpanded ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                trailing:  Icon(widget.isExpanded ? Icons.arrow_drop_up : Icons.arrow_drop_down,
                       size: 30),
-                  onPressed: () {
-                    setState(() {
-                      widget.isExpanded = !widget.isExpanded;
-                    });
-                  },
                 ),
               ),
             ),
-          ),
           widget.isExpanded ?
           ListView.builder(
               physics: const ClampingScrollPhysics(),
               shrinkWrap: true,
               itemCount: widget.itemNoList.length,
               itemBuilder: (context, index) {
-                return PartCard(itemNo: widget.itemNoList[index],
-                    colorCode: widget.colorCodeList[index], partIndex: index + 1,);
+                return PartCard(
+                  itemNo: widget.itemNoList[index],
+                  colorCode: widget.colorCodeList[index],
+                  partIndex: index + 1,
+                  partImageUrl: widget.partImageUrlList[index]);
           }) : const SizedBox()
         ],
       ),
+    );
+  }
+}
+
+class ShowImage extends StatelessWidget {
+  const ShowImage({Key? key, required this.imageUrl}) : super(key: key);
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: imageUrl == '' ?
+            Image.asset('images/no_image.png', width: 60, height: 60) :
+            Image.network('http:$imageUrl', width: 60, height: 60),
     );
   }
 }

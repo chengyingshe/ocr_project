@@ -13,7 +13,9 @@ import 'local_db_management.dart';
 import 'dart:io';
 import 'api.dart';
 import 'voice_recorder.dart';
-
+import 'dart:async' show Future;
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:csv/csv.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({Key? key, required this.title, required this.autoFocus})
@@ -32,19 +34,18 @@ class _SearchPageState extends State<SearchPage> {
   TextEditingController numberController = TextEditingController();
   String showText = "";
   bool loading = false;
-  // List<String> parts = [];
   List<String> setNumberList = [];
   List<String> itemNoList = [];
   List<String> colorCodeList = [];
   ImagePicker picker = ImagePicker();
-  // File? _userImage;
-  // XFile? imageXFile;
   bool bload = false;
   bool _showClearButton = false;
   bool solveImageIsFile = false;
   late File _userImage;
   String debugText = "";
-
+  List<List<dynamic>> data = [];
+  List<String> partImageUrlList = [];
+  String setImageUrl = '';
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +124,9 @@ class _SearchPageState extends State<SearchPage> {
                               itemNoList: itemNoList,
                               colorCodeList: colorCodeList,
                               isExpanded: widget.title == "本地检索" ? false : true,
-                              canDelete: false);
+                              canDelete: widget.title == "本地检索" ? true : false,
+                              setImageUrl: setImageUrl,
+                              partImageUrlList: partImageUrlList);
                         }),
               ],
             ),
@@ -134,6 +137,9 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.title == '网络检索') {
+      loadCSVData();
+    }
     numberController.addListener(() {
       setState(() {
         _showClearButton = numberController.text.isNotEmpty;
@@ -171,70 +177,11 @@ class _SearchPageState extends State<SearchPage> {
         loading = true;
       });
       if (widget.title == "本地检索") { // search from local data
-        switch (_selectedOption) { // 根据选择使用不同查找方式
-          case Selection.fromSetNum:
-            if (await numberIsExist(input)) {
-              setNumberList = [input];
-            } else {
-              setNumberList = [];
-            }
-            break;
-          case Selection.fromItemNo:
-            setNumberList = await getSetsNumberByItemNo(input);
-            break;
-          case Selection.fromColorCode:
-            setNumberList = await getSetsNumberByColorCode(input);
-            break;
-        }
-        print("setNumberList=${setNumberList.toString()}");
-        if (setNumberList.isEmpty) { // not exists in local data
-          setState(() {
-            showText = "从本地未查询到相应的乐高模组";
-            loading = false;
-          });
-        } else { // exists in local data
-          setState(() {
-            showText = "从本地查询到以下乐高模组：";
-          });
-          for (String set in setNumberList) {
-            List<List<String>?> ic = await getListOfPartsBySetNum(set);
-            itemNoList = ic[0]!;
-            colorCodeList = ic[1]!;
-          }
-          setState(() {
-            loading = false;
-          });
-        }
-
-      } else {
-        //search from network
-        String? html = await getHtmlFromNetwork2(input);
-        if (html == null) {
-          // network error
-          Toast.show('网络出现异常', gravity: Toast.bottom);
-          setState(() {
-            loading = false;
-          });
-        } else {
-          debugPrint(html);
-          List<List<String>> ic = getItemNoAndColorCodeOfPartsFromHtml(html);
-          itemNoList = ic[0];
-          colorCodeList = ic[1];
-          if (itemNoList.isEmpty || colorCodeList.isEmpty) { // not found
-            setState(() {
-              showText = "从网络中未查询到相应的乐高模组";
-              // showText = html;
-            });
-          } else {
-            setState(() {
-              setNumberList = [numberController.text];
-              showText = "从网络中查询到以下乐高模组：";
-            });
-          }
-          setState(() {
-            loading = false;
-          });
-        }
+        searchFromLocalData(input);
+      } else { // search from network
+        // searchFromNetwork(input);
+        // now is searching from csv
+        searchFromCSV(input);
       }
     }
   }
@@ -306,6 +253,37 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
+  //加载本地csv文件
+  Future<void> loadCSVData() async {
+    final csvData = await rootBundle.loadString('assets/lego_parts.csv');
+    List<List<dynamic>> csvTable = const CsvToListConverter().convert(csvData);
+    print(csvTable.toString());
+    setState(() {
+      data = csvTable;
+    });
+  }
+
+  // return [[number, setImageUrl], colorCodeList, itemNoList, partImageUrlList]
+  List<List<String>>? getAllInfoFromCSVBySetNum(String number) {
+    List<String> partImageUrlList = [];
+    List<String> itemNoList = [];
+    List<String> colorCodeList = [];
+    String setImageUrl = '';
+    for (var row in data) {
+      // print('row=${row.toString()}');
+      if (row[0].toString() == number) {
+        setImageUrl = row[1].toString();
+        colorCodeList.add(row[2].toString());
+        itemNoList.add(row[3].toString());
+        partImageUrlList.add(row[4].toString());
+      }
+    }
+    if (itemNoList.isEmpty) {
+      return null;
+    }
+    return [[number, setImageUrl], colorCodeList, itemNoList, partImageUrlList];
+  }
+
   Future<void> selectImage() async {
     //点击相册返回0，点击相机返回1
     int? select = await _bottomChoseSheet(context);
@@ -360,7 +338,6 @@ class _SearchPageState extends State<SearchPage> {
       });
     }
   }
-
   Future<String?> getHtmlFromNetwork(String number) async {
     //从官网获取套件及零件编号
     //https://www.bricklink.com/catalogList.asp
@@ -396,7 +373,6 @@ class _SearchPageState extends State<SearchPage> {
     });
     return partsList;
   }
-
   Future<String?> getHtmlFromNetwork2(String number) async {
     //从官网获取套件及零件编号  获取套装编号（图片）、积木块的设计编号、元素编号（图片）
     //https://www.bricklink.com/v2/catalog/catalogitem.page?S=60114-1#T=I
@@ -419,6 +395,93 @@ class _SearchPageState extends State<SearchPage> {
     } catch (e) {
       return null;
     }
+  }
+  Future<void> searchFromNetwork(String input) async {
+    //search from network
+    String? html = await getHtmlFromNetwork2(input);
+    if (html == null) {
+      // network error
+      Toast.show('网络出现异常', gravity: Toast.bottom);
+      setState(() {
+        loading = false;
+      });
+    } else {
+      List<List<String>> ic = getItemNoAndColorCodeOfPartsFromHtml(html);
+      itemNoList = ic[0];
+      colorCodeList = ic[1];
+      if (itemNoList.isEmpty || colorCodeList.isEmpty) { // not found
+        setState(() {
+          showText = "从网络中未查询到相应的乐高模组";
+          // showText = html;
+        });
+      } else {
+        setState(() {
+          setNumberList = [numberController.text];
+          showText = "从网络中查询到以下乐高模组：";
+        });
+      }
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+  Future<void> searchFromLocalData(String input) async {
+    switch (_selectedOption) { // 根据选择使用不同查找方式
+      case Selection.fromSetNum:
+        if (await numberIsExist(input)) {
+          setNumberList = [input];
+        } else {
+          setNumberList = [];
+        }
+        break;
+      case Selection.fromItemNo:
+        setNumberList = await getSetsNumberByItemNo(input);
+        break;
+      case Selection.fromColorCode:
+        setNumberList = await getSetsNumberByColorCode(input);
+        break;
+    }
+    print("setNumberList=${setNumberList.toString()}");
+    if (setNumberList.isEmpty) { // not exists in local data
+      setState(() {
+        showText = "从本地未查询到相应的乐高模组";
+        loading = false;
+      });
+    } else { // exists in local data
+      setState(() {
+        showText = "从本地查询到以下乐高模组：";
+      });
+      for (String set in setNumberList) {
+        List<List<String>?> ic = await getListOfPartsBySetNum(set);
+        itemNoList = ic[0]!;
+        colorCodeList = ic[1]!;
+        setImageUrl = ic[2]![0];
+        partImageUrlList = ic[3]!;
+      }
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+  void searchFromCSV(String input) {
+    setState(() { loading = true; });
+    List<List<String>>? allInfo = getAllInfoFromCSVBySetNum(input);
+    // print('allInfo=${allInfo.toString()}');
+    if (allInfo == null) {
+      setState(() {
+        showText = "从数据库中未查询到相应的乐高模组";
+      });
+    } else {
+      setState(() {
+        showText = "从数据库中查询到以下乐高模组";
+        setNumberList = [numberController.text];
+        setImageUrl = allInfo[0][1];
+        itemNoList = allInfo[2];
+        colorCodeList = allInfo[1];
+        partImageUrlList = allInfo[3];
+      });
+    }
+    setState(() { loading = false; });
   }
 
   List<List<String>> getItemNoAndColorCodeOfPartsFromHtml(String html) {
@@ -450,7 +513,6 @@ class _SearchPageState extends State<SearchPage> {
     print(colorCodeList.toString());
     return [itemNoList, colorCodeList];
   }
-
   //点击设置后跳出对话框，显示查找类型（SetNum, itemNo, colorCode）
   Future<void> showSearchSetting() {
     return showDialog(

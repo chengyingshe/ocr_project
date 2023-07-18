@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'model_card.dart';
 
 class PartCard extends StatelessWidget {
   const PartCard(
       {Key? key,
       required this.itemNo,
       required this.colorCode,
-      required this.partIndex})
+      required this.partIndex,
+      required this.partImageUrl})
       : super(key: key);
   final String itemNo;
   final String colorCode;
   final int partIndex;
+  final String partImageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -19,11 +22,12 @@ class PartCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.all(15),
+            padding: const EdgeInsets.fromLTRB(15, 15, 5, 15),
             child: Text('Part $partIndex'),
           ),
+          ShowImage(imageUrl: partImageUrl),
           SizedBox(
-            width: MediaQuery.of(context).size.width * 0.6,
+            width: MediaQuery.of(context).size.width * 0.5,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.start,
