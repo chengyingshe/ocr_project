@@ -91,8 +91,6 @@ class _CameraScreenState extends State<CameraScreen> {
       croppedImagePath = '${appDir.path}/cropped_image.jpg';
       File(croppedImagePath)
           .writeAsBytesSync(img.encodeJpg(croppedImage)); //把图片保存到本地
-      // 打印裁剪后图像的保存路径
-      // print('Cropped image saved to: $croppedImagePath');
       // String text = await extractTextFromImagePath(croppedImagePath);
       String text = await extractTextFromImagePathUsingBaiduApi(croppedImagePath);
       detectText = text == "" ? detectNoText : text;
@@ -113,7 +111,6 @@ class _CameraScreenState extends State<CameraScreen> {
       );
     }
     return Scaffold(
-      // appBar: AppBar(title: Text("识别中...")),
       body: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
         var myContext = context;

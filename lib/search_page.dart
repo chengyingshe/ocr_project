@@ -269,9 +269,11 @@ class _SearchPageState extends State<SearchPage> {
     List<String> itemNoList = [];
     List<String> colorCodeList = [];
     String setImageUrl = '';
+    String setNumber = '';
     for (var row in data) {
       // print('row=${row.toString()}');
-      if (row[0].toString() == number) {
+      if (row[0].toString().startsWith(number)) {
+        setNumber = row[0].toString();
         setImageUrl = row[1].toString();
         colorCodeList.add(row[2].toString());
         itemNoList.add(row[3].toString());
@@ -281,7 +283,7 @@ class _SearchPageState extends State<SearchPage> {
     if (itemNoList.isEmpty) {
       return null;
     }
-    return [[number, setImageUrl], colorCodeList, itemNoList, partImageUrlList];
+    return [[setNumber, setImageUrl], colorCodeList, itemNoList, partImageUrlList];
   }
 
   Future<void> selectImage() async {
@@ -474,7 +476,7 @@ class _SearchPageState extends State<SearchPage> {
     } else {
       setState(() {
         showText = "从数据库中查询到以下乐高模组";
-        setNumberList = [numberController.text];
+        setNumberList = [allInfo[0][0]];
         setImageUrl = allInfo[0][1];
         itemNoList = allInfo[2];
         colorCodeList = allInfo[1];
